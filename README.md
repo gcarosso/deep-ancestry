@@ -6,6 +6,8 @@ Drop the export from 23andMe, AncestryDNA, MyHeritage, Family Tree DNA or Living
 computes what your genotypes genuinely support on their own, pairs it with published population
 genetics, and hands you a self-contained HTML module you can paste into a personal site.
 
+Built by [Giovanni Carosso](https://gcarosso.bio); the module runs live on the [About page](https://gcarosso.bio/about) there.
+
 No server. No upload. No analytics. No cookies. No network requests of any kind. Seven static files — you can read all of them, and you can run the whole thing offline.
 
 ![deep-ancestry](docs/screenshot.png)
