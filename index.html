@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Deep Ancestry — read your own raw DNA file, in your own browser</title>
+<meta name="description" content="Drop a raw 23andMe, AncestryDNA or MyHeritage file. Computes runs of homozygosity and your maternal haplogroup locally, pairs them with published population genetics, and exports an embeddable module for your own site. Nothing is uploaded."/>
+<link rel="stylesheet" href="assets/style.css"/>
+</head>
+<body>
+
+<header class="hd">
+  <div class="wrap">
+    <div class="brand"><span class="mark">&#9792;&#9794;</span> deep&#8209;ancestry</div>
+    <nav><a href="https://github.com/gcarosso/deep-ancestry" class="gh">source</a></nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ------------------------------------------------------------- screen 1 -->
+<section id="screen-drop">
+  <h1>Read your own raw DNA file.</h1>
+  <p class="lede">Drop the export from 23andMe, AncestryDNA, MyHeritage, Family&nbsp;Tree&nbsp;DNA or
+  Living&nbsp;DNA. This page computes what your genotypes can genuinely support on their own, pairs it
+  with published population genetics, and hands you an embeddable module for your own site.</p>
+
+  <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose or drop a raw DNA file">
+    <input type="file" id="file" accept=".txt,.csv,.tsv,.zip" hidden/>
+    <div class="dropin">
+      <div class="dropbig">Drop your raw data file here</div>
+      <div class="dropsub">or click to choose &middot; .txt or .csv, 15–30&nbsp;MB &middot; unzip it first</div>
+    </div>
+    <div class="prog" id="prog" hidden><div class="bar"><i id="progbar"></i></div><span id="progtxt">reading…</span></div>
+  </div>
+  <p class="tryline">No file to hand? <button class="link" id="try">Load the synthetic sample</button> —
+  a made-up genome with a planted homozygous run, for seeing what the output looks like.</p>
+
+  <div class="privacy">
+    <span class="pk">Privacy</span>
+    <p><b>Your file never leaves this browser.</b> There is no server, no upload, no analytics, no
+    cookies, no network request of any kind. The page is seven static files; you can read all of them, and you
+    can run the whole thing offline by opening <code>index.html</code> from disk with your Wi‑Fi off.
+    Genetic data is not revocable — treat any site that asks you to upload it accordingly.</p>
+  </div>
+
+  <div class="claims">
+    <div class="claim can">
+      <span class="ck">What it computes from your file</span>
+      <ul>
+        <li><b>Runs of homozygosity and F<sub>ROH</sub></b> — stretches you inherited identical from
+          both parents. Tells you whether your parents were related, and whether your background
+          carries an endogamy signal. Consumer reports do not give you this.</li>
+        <li><b>Your maternal haplogroup</b>, called from the mitochondrial positions on the chip, with
+          every position it rests on shown and every branch it excludes listed.</li>
+        <li><b>Chromosomal sex and chip coverage</b> — what your particular array can and cannot answer.</li>
+      </ul>
+    </div>
+    <div class="claim cant">
+      <span class="ck">What it cannot, and will not fake</span>
+      <ul>
+        <li><b>Ancestry percentages.</b> These need labelled reference panels — thousands of genomes
+          from known populations — which no raw file contains. Paste your provider's numbers in and
+          they are labelled as your provider's estimate throughout.</li>
+        <li><b>Your paternal haplogroup.</b> Y-SNP names do not map cleanly onto array probes, and a
+          wrong call is worse than none. Enter it from your report and the tool does the useful part:
+          the geography, dating and citations.</li>
+        <li><b>Chromosome painting, health, traits or relatives.</b> Out of scope, deliberately.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------- screen 2 -->
+<section id="screen-report" hidden>
+  <h2 class="s2">What&rsquo;s in your file</h2>
+  <div class="grid" id="chipcards"></div>
+
+  <h2 class="s2">Fill in what the file cannot say</h2>
+  <div class="forms">
+    <div class="fld">
+      <label for="ycall">Paternal haplogroup <span class="opt">from your provider&rsquo;s report</span></label>
+      <input id="ycall" list="ylist" placeholder="e.g. R-M269, I1, E-V13, J2-M172"/>
+      <datalist id="ylist"></datalist>
+      <p class="help" id="yhelp">23andMe calls this &ldquo;Paternal haplogroup&rdquo;. Leave blank if you have no Y chromosome or no report.</p>
+    </div>
+    <div class="fld">
+      <label for="mtcall">Maternal haplogroup <span class="opt">override the computed call if you have a deeper one</span></label>
+      <input id="mtcall" placeholder="computed from your file"/>
+      <p class="help" id="mthelp"></p>
+    </div>
+    <div class="fld wide">
+      <label for="comp">Ancestry composition <span class="opt">paste it straight from your provider</span></label>
+      <textarea id="comp" rows="7" placeholder="Italian 33.8%&#10;French &amp; German 28.5%&#10;Eastern European 20.9%&#10;Ashkenazi Jewish 10.8%&#10;Broadly European 4.2%"></textarea>
+      <p class="help">One region per line, in any order. <code>Italian 33.8%</code> and <code>33.8% Italian</code> both parse. Copy and paste from the report works.</p>
+      <div id="compout" class="compout"></div>
+    </div>
+  </div>
+
+  <h2 class="s2">What goes in the module</h2>
+  <div class="forms">
+    <div class="fld"><label for="ttl">Heading</label><input id="ttl" value="More about me"/></div>
+    <div class="fld"><label for="eyb">Eyebrow</label><input id="eyb" value="Ancestry"/></div>
+    <div class="fld wide toggles">
+      <label class="tog"><input type="checkbox" id="incRoh" checked/> <span>Include the runs-of-homozygosity view</span>
+        <em>This describes how related your parents were. Fine to publish, fine not to — your call.</em></label>
+      <label class="tog"><input type="checkbox" id="incEvi" checked/> <span>Include the maternal evidence table</span>
+        <em>Every mitochondrial position the call rests on. Shows your work; adds a table.</em></label>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="build" class="btn primary">Build my module</button>
+    <button id="reset" class="btn">Start over with a different file</button>
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------- screen 3 -->
+<section id="screen-out" hidden>
+  <div class="outhead">
+    <h2 class="s2">Your module</h2>
+    <div class="actions">
+      <button id="dl" class="btn primary">Download ancestry.html</button>
+      <button id="copy" class="btn">Copy HTML</button>
+      <button id="back" class="btn">Back to the form</button>
+    </div>
+  </div>
+  <p class="lede small">Self-contained: no JavaScript, no webfonts, no network requests, every rule
+  scoped under <code>.anc</code>. Paste the file&rsquo;s two blocks into any page.</p>
+  <div id="preview" class="preview"></div>
+</section>
+
+</main>
+
+<footer class="ft"><div class="wrap">
+  <p>deep-ancestry runs entirely in your browser. MIT licensed. The haplogroup literature table is
+  small, fully cited, and meant to be extended — adding a haplogroup or a map region is a data-only
+  pull request.</p>
+  <p class="warn">Not a medical, diagnostic or legal tool. Nothing here is advice of any kind.</p>
+</div></footer>
+
+<script src="assets/data.js"></script>
+<script src="assets/geo.js"></script>
+<script src="assets/analyze.js"></script>
+<script src="assets/render.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
