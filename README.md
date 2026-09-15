@@ -1,154 +1,151 @@
 # deep-ancestry
 
-**Read your own raw DNA file, in your own browser, and get an embeddable module for your site.**
+Analyze a consumer DNA export in your browser and build an embeddable ancestry module for your site.
 
-Drop the export from 23andMe, AncestryDNA, MyHeritage, Family Tree DNA or Living DNA. The page
-computes what your genotypes genuinely support on their own, pairs it with published population
-genetics, and hands you a self-contained HTML module you can paste into a personal site.
+The tool accepts raw files from 23andMe, AncestryDNA, MyHeritage, Family Tree DNA, and Living DNA.
+It computes runs of homozygosity, estimates maternal haplogroup from the available mitochondrial
+markers, and summarizes chip coverage. You can add ancestry percentages and a paternal haplogroup
+from your provider's report, then export a self-contained HTML module with population-genetic context
+and citations.
 
-Built by [Giovanni Carosso](https://gcarosso.bio); the module runs live on the [About page](https://gcarosso.bio/about) there.
+Built by [Giovanni Carosso](https://gcarosso.bio). An example module is embedded on my
+[About page](https://gcarosso.bio/about).
 
-No server. No upload. No analytics. No cookies. No network requests of any kind. Seven static files — you can read all of them, and you can run the whole thing offline.
+Analysis runs locally in the browser, without uploading your genetic data. The application uses
+static HTML, CSS, and JavaScript, with no analytics or cookies. You can also run it offline.
 
 ![deep-ancestry](docs/screenshot.png)
 
----
+## Design
 
-## Why this exists
+I built deep-ancestry to make the evidence behind an ancestry report visible: which results come
+from the raw genotypes, which depend on a provider's reference data, and where chip coverage limits
+interpretation. Computed results include their supporting markers or analysis parameters. Ancestry
+percentages entered from a consumer report remain labeled as the provider's estimates.
 
-Consumer reports give you a pie chart and a haplogroup name. They do not tell you where those
-numbers come from, what the array could not see, or what your own genotypes can prove without any
-reference data at all. This tool is built the other way round: **every number is either computed
-from your file and shown with its evidence, or labelled as your provider's estimate.** Nothing in
-between, and nothing invented.
+## Functionalities
 
-That constraint is the whole design. It is also why the tool is smaller than you might expect.
-
-## What it computes from your file
-
-| | |
+| Analysis or output | Method and scope |
 |---|---|
-| **Runs of homozygosity, and F<sub>ROH</sub>** | Stretches of chromosome you inherited identical from both parents. Tells you whether your parents were related, and separately whether your ancestry carries a background endogamy signal. Needs nothing but your own genotypes, and no consumer report gives it to you. |
-| **Maternal haplogroup** | Called from the mitochondrial positions on your chip, against a curated fragment of the mtDNA phylogeny. Every position the call rests on is shown; every branch it excludes is listed; branches the chip cannot test are named. |
-| **Chromosomal sex and chip coverage** | From chrX heterozygosity and chrY call rate, plus what your particular array does and does not carry. |
+| **Runs of homozygosity and F<sub>ROH</sub>** | Detects long stretches of homozygous autosomal markers and reports their lengths and fraction of a fixed reference genome length. The segment distribution supports interpretation of recent and background relatedness; it does not establish a specific parental relationship. |
+| **Maternal haplogroup** | Compares mitochondrial positions on the chip with a curated portion of the mtDNA phylogeny. Shows supporting markers, excluded branches, and branches the chip cannot distinguish. |
+| **Chromosomal sex estimate and chip coverage** | Uses chrX heterozygosity and chrY call rate to estimate chromosomal sex, with an ambiguous result when the thresholds are not met. Summarizes the markers available on the array. |
+| **Population-genetic context** | Combines provider-reported ancestry percentages and haplogroups with geography, published frequencies, dates, and citations from the bundled literature table. |
+| **Embeddable module** | Exports a single HTML file containing styles and an ancestry section. The ROH view and maternal evidence table are optional. |
 
-## What it will not fake
+## ROH method
 
-**Ancestry percentages.** Assigning a chromosome segment to a population requires labelled
-reference panels — thousands of genomes from known populations. No raw file contains them, and
-this tool does not ship them. You paste your provider's numbers in, and they are labelled as your
-provider's estimate everywhere they appear.
+Sparse marker coverage can create apparent runs of homozygosity. A method based only on gaps
+between heterozygous calls can span centromeres or other regions with few probes, inflating both
+segment lengths and F<sub>ROH</sub>.
 
-**Your paternal haplogroup.** Y-SNP names do not map cleanly onto consumer array probes, and a
-confidently wrong Y call is worse than no call. Enter yours from your report and the tool does the
-part that is actually useful: geography, dating, frequencies, citations.
+This implementation uses a PLINK-style sliding window of 50 SNPs, allowing one heterozygous call.
+Retained runs must meet all four criteria:
 
-**Chromosome painting, health, traits, relatives.** Out of scope, deliberately. A painting view
-would look wonderful and would be entirely invented.
+- Length of at least 1 Mb.
+- At least 100 SNPs.
+- Density of at least 20 SNPs/Mb.
+- A maximum gap of 1 Mb between consecutive markers.
 
-## The runs-of-homozygosity result, and why the filters matter
+The density and gap filters reduce false runs across poorly covered regions. F<sub>ROH</sub> is the
+summed length of retained runs divided by a fixed GRCh37 autosomal length. The report also shows
+the segment-length distribution, which provides context for interpreting the total. The tool's
+relatedness categories are heuristic interpretations of that distribution.
 
-ROH detection is the one place a naive implementation produces spectacular, completely wrong
-numbers. Look for gaps between heterozygous calls and you get 20–27 Mb "runs" on chromosomes 1, 9
-and 16 every single time. Those are centromeres and heterochromatin, where the array simply has no
-probes — and **absence of heterozygous calls is not evidence of homozygosity.**
+## Limitations
 
-This implementation is PLINK-style: a 50-SNP sliding window allowing one heterozygote, merged runs
-kept only at ≥1 Mb, ≥100 SNPs, ≥20 SNPs/Mb, with a 1 Mb maximum gap between consecutive markers.
-The density floor and the gap cap are what keep the centromeres out. Without them F<sub>ROH</sub>
-comes out roughly **eight times too high**.
-
-Segment *length* carries the information, not the total: a shared ancestor *n* generations back
-leaves segments of characteristic size. First-cousin parents give F<sub>ROH</sub> near 0.0625 with
-several segments over 10 Mb. Many short segments and none long is a different thing entirely —
-background relatedness from endogamy, many distant shared ancestors rather than one recent one.
-The tool reports the length distribution and says which pattern it sees.
+- **Ancestry percentages require population reference data.** The repository does not include
+  reference panels or estimate population ancestry from the raw file. Percentages are entered
+  from your provider's report and labeled accordingly.
+- **Paternal haplogroup is supplied by the user.** The tool does not classify Y haplogroups from
+  consumer-array probes. It provides context for a haplogroup entered from an existing report.
+- **Maternal resolution depends on marker coverage and tree coverage.** The bundled phylogeny
+  contains selected branches rather than the full PhyloTree. Missing markers can prevent a
+  specific assignment; an unassignable sample receives no call. Sequencing may support finer
+  resolution than an array.
+- **Haplogroups represent individual lines of descent.** Maternal and paternal haplogroups describe
+  two lineages within a much larger family history, with limited information about overall ancestry.
+- **ROH results depend on coverage, filters, and denominator.** Array gaps and analysis choices affect
+  the result. Compare methods and segment distributions before comparing F<sub>ROH</sub> values
+  across tools.
+- **Geographic coverage is limited.** The map includes a European and Mediterranean coastline.
+  Frequencies outside that frame are listed instead of plotted. For lineages outside the mapped
+  area, a note replaces the map while the other views remain available.
+- **Analysis scope excludes chromosome painting, health and trait prediction, and relative
+  matching.** The tool is intended for personal exploration, not medical, diagnostic, forensic,
+  or legal use.
 
 ## Privacy
 
-Genetic data is not revocable. You cannot change it, and you cannot take it back once it is
-somewhere else.
+Raw genetic data is read with `FileReader` and held in browser memory during the page view. The
+application does not upload it or write it to persistent browser storage. Closing the tab ends
+the session; exported files remain wherever you save them.
 
-- The file is read with `FileReader` and held in memory for the length of the page view.
-- There is no fetch, no XHR, no WebSocket, no beacon, no third-party script, no font CDN, no
-  analytics anywhere in this repository. Grep for it.
-- Close the tab and it is gone. Nothing is written to storage.
-- The exported module contains only what you chose to include — the ROH view and the maternal
-  evidence table are both optional, because both say something about your family rather than only
-  about you.
-- Verify it yourself: turn off your network and load the page from disk. Everything works.
+The application includes no analytics, third-party scripts, or externally hosted fonts. The
+synthetic-sample button fetches `data/sample-23andme.txt` from the same host. Loading the hosted
+page also requests its static assets; local analysis requires no external service.
 
-## Running it
+The exported module contains the results you select for inclusion. Review it before publishing:
+ROH results and haplogroup evidence can disclose information about relatives as well as yourself.
 
-**Hosted** — GitHub Pages, or any static host. The included workflow deploys `main` on push.
+## Usage
 
-**Locally, over http** (needed only for the *Load the synthetic sample* button):
+**Hosted:** serve the repository through GitHub Pages or another static host. The included workflow
+deploys `main` on push when GitHub Pages is configured for Actions.
+
+**Local HTTP server:** this supports the synthetic-sample button as well as file imports.
 
 ```bash
-git clone https://github.com/gcarosso/deep-ancestry && cd deep-ancestry
-python3 -m http.server 8000     # then open http://localhost:8000
+git clone https://github.com/gcarosso/deep-ancestry
+cd deep-ancestry
+python3 -m http.server 8000
 ```
 
-**Locally, from disk** — open `index.html` directly. Everything works except the sample button;
-browsers block a page opened from `file://` from reading sibling files, which is a security
-feature, not a bug. Drag `data/sample-23andme.txt` onto the drop zone instead.
+Open `http://localhost:8000` in your browser.
 
-## Using the module you get
+**Local file:** open `index.html` directly. Browsers may block the sample button's request to a
+sibling file under `file://`; drag `data/sample-23andme.txt` onto the drop zone to load it instead.
+This route also works offline.
 
-The download is one file with two blocks: a `<style>` and a `<section class="anc">`. Paste both
-into any page. No JavaScript, no webfonts, no network requests — all interaction is CSS
-(`:hover`, `:focus-visible`, `:has`), so it renders complete with JS disabled and is keyboard
-navigable. Every rule is scoped under `.anc`; nothing leaks either way. It paints its own dark
-ground, so it sits as a deliberate inset panel on a light page.
+## Embedding the module
+
+The downloaded file contains a `<style>` block and a `<section class="anc">` block. Paste both into
+your page. The module uses CSS interactions (`:hover`, `:focus-visible`, and `:has`) and requires
+no JavaScript, webfonts, or network requests. Interactive elements support keyboard navigation.
+
+The module's CSS selectors are scoped under `.anc` to limit effects on the host page, though host
+styles can still affect the module. Its dark background provides a consistent inset on light pages.
 
 ## Repository layout
 
 ```
-index.html               the app shell
-assets/style.css         application chrome
-assets/data.js           mtDNA phylogeny fragment + the literature table
-assets/geo.js            coastline sketch + region gazetteer
-assets/analyze.js        parsing, ROH, mtDNA classification, sex inference
-assets/render.js         the module: three views, the CSS, the export
-assets/app.js            UI wiring
-data/sample-23andme.txt  synthetic sample genome (not a real person)
-tools/make_sample.py     regenerates it
+index.html              application shell
+assets/style.css        application styles
+assets/data.js          mtDNA phylogeny fragment and literature table
+assets/geo.js           coastline sketch and region gazetteer
+assets/analyze.js       parsing, ROH, mtDNA classification, and sex inference
+assets/render.js        module views, styles, and export
+assets/app.js           interface wiring
+data/sample-23andme.txt synthetic sample genome
+tools/make_sample.py    sample generator
 ```
 
-The module's styles live in `render.js`, not in a stylesheet, so the live preview and the exported
-file are literally the same string and cannot drift apart.
+The module's styles live in `render.js`. The live preview and downloaded file use the same
+rendered HTML string.
 
-## Extending it
+## Contributions
 
-The two data tables are meant to grow, and both are data-only pull requests:
+The literature and geography tables can be extended without changing the analysis code:
 
-- **`LITERATURE` in `assets/data.js`** — haplogroup dating, published frequencies, citations. It
-  ships small and fully sourced on purpose. Entries carry `precision: 'published'` for a specific
-  figure from a named paper and `precision: 'estimate'` for a widely-reported range, and the two
-  render differently so nobody mistakes one for the other. **An entry without a citation does not
-  belong in the table.**
-- **`REGION_GEO` in `assets/geo.js`** — provider region names to map positions. Names with no
-  entry are listed in the module's caption rather than dropped silently.
-
-The map ships a European and Mediterranean coastline. Frequencies outside that frame are listed
-rather than drawn; if your lineage's geography falls outside it, the map view is replaced by a note
-and the other views are unaffected. Adding a coastline is also a data-only contribution.
+- **`LITERATURE` in `assets/data.js`:** haplogroup dates, frequencies, and citations. Use
+  `precision: 'published'` for a specific figure from a named paper and `precision: 'estimate'`
+  for a reported range. The module displays these categories differently. Include a citation
+  for every entry.
+- **`REGION_GEO` in `assets/geo.js`:** provider region names and map positions. Unmapped names
+  appear in the module's caption. Additional coastlines can extend the geographic coverage.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Limits worth stating plainly
-
-- A haplogroup traces **one ancestor per generation** out of thousands. Twelve generations back you
-  had more than a thousand ancestors; two haplogroups describe two of them.
-- Consumer arrays carry a few thousand mitochondrial and Y positions chosen in the early 2010s. A
-  haplogroup resolves to the depth those markers allow and no further. Going deeper needs
-  sequencing, and mitochondrial sequencing is cheap.
-- F<sub>ROH</sub> is computed against a fixed GRCh37 autosome length. Different tools use different
-  denominators, so compare the segment distribution rather than the headline number across tools.
-- The mtDNA tree covers the major branches, not all of PhyloTree. An unassignable sample gets no
-  call rather than a guess.
-- **Not a medical, diagnostic, forensic, or legal tool.** Nothing here is advice of any kind.
-
-## Licence
+## License
 
 MIT. See [LICENSE](LICENSE).
